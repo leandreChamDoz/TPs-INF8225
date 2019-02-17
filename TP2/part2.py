@@ -61,6 +61,8 @@ test_loader = torch.utils.data.DataLoader(
 plt.imshow(train_loader.dataset.train_data[1].numpy())
 plt.show()
 
+kernel_size = 5
+kernel_size_pooling = 2
 
 class FcNetwork(nn.Module):
     def __init__(self):
@@ -75,12 +77,32 @@ class FcNetwork(nn.Module):
         x = F.log_softmax(self.fc2(x), dim=1)
         return x
 
+class Cnn(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.kernel1 = nn.Sequential(
+            nn.Conv2d(1, 32, kernel_size),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size_pooling)
+        )
+
+        self.kernel2 = nn.Sequential(
+            nn.Conv2d(32, 64, kernel_size),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size_pooling)
+        )
+        self.drop_out = nn.Dropout()
+        #self.fc1 = nn.Linear(64, )
+        #self.fc2 =
+
+    def forward(self, image):
+
 
 def train(model, train_loader, optimizer):
     model.train()
     for batch_idx, (data, target) in enumerate(train_loader):
-        # data, target = Variable(data, volatile=True).cuda(), Variable(target).cuda() # if you have access to a gpu
-        data, target = Variable(data), Variable(target)
+        data, target = Variable(data, volatile=True).cuda(), Variable(target).cuda() # if you have access to a gpu
+        # data, target = Variable(data), Variable(target)
         optimizer.zero_grad()
         output = model(data)  # calls the forward function
         loss = F.nll_loss(output, target)
@@ -94,10 +116,10 @@ def valid(model, valid_loader):
     valid_loss = 0
     correct = 0
     for data, target in valid_loader:
-        # data, target = Variable(data, volatile=True).cuda(), Variable(target).cuda() # if you have access to a gpu
-        data, target = Variable(data, volatile=True), Variable(target)
+        data, target = Variable(data, volatile=True).cuda(), Variable(target).cuda() # if you have access to a gpu
+        # data, target = Variable(data, volatile=True), Variable(target)
         output = model(data)
-        valid_loss += F.nll_loss(output, target, size_average=False).data[0]  # sum up batch loss
+        valid_loss += F.nll_loss(output, target, size_average=False).data.item()  # sum up batch loss
         pred = output.data.max(1, keepdim=True)[1]  # get the index of the max log-probability
         correct += pred.eq(target.data.view_as(pred)).cpu().sum()
 
@@ -113,10 +135,10 @@ def test(model, test_loader):
     test_loss = 0
     correct = 0
     for data, target in test_loader:
-        # data, target = Variable(data, volatile=True).cuda(), Variable(target).cuda() # if you have access to a gpu
-        data, target = Variable(data, volatile=True), Variable(target)
+        data, target = Variable(data, volatile=True).cuda(), Variable(target).cuda() # if you have access to a gpu
+        # data, target = Variable(data, volatile=True), Variable(target)
         output = model(data)
-        test_loss += F.nll_loss(output, target, size_average=False).data[0]  # sum up batch loss
+        test_loss += F.nll_loss(output, target, size_average=False).data.item() # sum up batch loss
         pred = output.data.max(1, keepdim=True)[1]  # get the index of the max log-probability
         correct += pred.eq(target.data.view_as(pred)).cpu().sum()
 
@@ -140,8 +162,8 @@ def experiment(model, epochs=10, lr=0.001):
 
 
 best_precision = 0
-for model in [FcNetwork()]:  # add your models in the list
-    # model.cuda()  # if you have access to a gpu
+for model in [FcNetwork(), Cnn()]:  # add your models in the list
+    model.cuda()  # if you have access to a gpu
     model, precision = experiment(model)
     if precision > best_precision:
         best_precision = precision
