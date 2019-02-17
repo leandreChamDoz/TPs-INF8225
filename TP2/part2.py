@@ -59,10 +59,10 @@ test_loader = torch.utils.data.DataLoader(
     batch_size=test_batch_size, shuffle=True)
 
 plt.imshow(train_loader.dataset.train_data[1].numpy())
-plt.show()
 
 kernel_size = 5
 kernel_size_pooling = 2
+
 
 class FcNetwork(nn.Module):
     def __init__(self):
@@ -77,25 +77,32 @@ class FcNetwork(nn.Module):
         x = F.log_softmax(self.fc2(x), dim=1)
         return x
 
+
 class Cnn(nn.Module):
     def __init__(self):
         super().__init__()
         self.kernel1 = nn.Sequential(
-            nn.Conv2d(1, 32, kernel_size),
+            nn.Conv2d(1, 32, kernel_size, stride=1, padding=2),
             nn.ReLU(),
-            nn.MaxPool2d(kernel_size_pooling)
+            nn.MaxPool2d(kernel_size_pooling, stride=2)
         )
 
         self.kernel2 = nn.Sequential(
-            nn.Conv2d(32, 64, kernel_size),
+            nn.Conv2d(32, 64, kernel_size, stride=1, padding=2),
             nn.ReLU(),
-            nn.MaxPool2d(kernel_size_pooling)
+            nn.MaxPool2d(kernel_size_pooling, stride=2)
         )
         self.drop_out = nn.Dropout()
-        #self.fc1 = nn.Linear(64, )
-        #self.fc2 =
+        self.fc1 = nn.Linear(7 * 7 * 64, 1000)
+        self.fc2 = nn.Linear(1000, 10)
 
     def forward(self, image):
+        output = self.kernel1(image)
+        output = self.kernel2(output)
+        output = output.reshape(output.size(0), -1)
+        output = self.drop_out(output)
+        output = self.fc1(output)
+        return self.fc2(output)
 
 
 def train(model, train_loader, optimizer):
@@ -162,7 +169,7 @@ def experiment(model, epochs=10, lr=0.001):
 
 
 best_precision = 0
-for model in [FcNetwork(), Cnn()]:  # add your models in the list
+for model in [Cnn()]:  # add your models in the list
     model.cuda()  # if you have access to a gpu
     model, precision = experiment(model)
     if precision > best_precision:
