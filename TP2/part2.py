@@ -7,6 +7,7 @@ from torch.utils.data import Dataset, DataLoader
 from torch import nn
 from torch import optim
 import torch.nn.functional as F
+import random
 from torch.autograd import Variable
 
 
@@ -65,10 +66,16 @@ kernel_size_pooling = 2
 
 
 class FcNetwork(nn.Module):
-    def __init__(self):
+    def __init__(self, act_func, nb_layers):
         super().__init__()
-        self.fc1 = nn.Linear(28 * 28, 512)
-        self.fc2 = nn.Linear(512, 10)
+        self.nb_layers = nb_layers
+        self.act_func = act_func
+
+        self.fcStart = nn.Linear(28 * 28, 512)
+        self.fcEnd = nn.Linear(512, 10)
+
+        for i in range(nb_layers - 2):
+
 
     def forward(self, image):
         batch_size = image.size()[0]
@@ -79,8 +86,11 @@ class FcNetwork(nn.Module):
 
 
 class Cnn(nn.Module):
-    def __init__(self):
+    def __init__(self, act_func, nb_layers):
         super().__init__()
+        self.act_func = act_func
+        self.nb_layers = nb_layers
+
         self.kernel1 = nn.Sequential(
             nn.Conv2d(1, 32, kernel_size, stride=1, padding=2),
             nn.ReLU(),
@@ -92,30 +102,42 @@ class Cnn(nn.Module):
             nn.ReLU(),
             nn.MaxPool2d(kernel_size_pooling, stride=2)
         )
+
+        self.layers = []
+        self.layers.append(nn.Linear(7 * 7 * 64, 1000))
+
+        lastOutput = 1000
+
+        for i in range(nb_layers-2):
+            newOutput = int(random)
+            self.layers.append(nn.Linear(lastOutput, ))
+
+        self.layers.append(nn.Linear(1000, 10))
         self.drop_out = nn.Dropout()
-        self.fc1 = nn.Linear(7 * 7 * 64, 1000)
-        self.fc2 = nn.Linear(1000, 10)
 
     def forward(self, image):
         output = self.kernel1(image)
         output = self.kernel2(output)
         output = output.reshape(output.size(0), -1)
         output = self.drop_out(output)
-        output = self.fc1(output)
-        return self.fc2(output)
+        output = F.relu(self.fc1(output))
+        return F.log_softmax(self.fc2(output), dim=1)
 
 
 def train(model, train_loader, optimizer):
     model.train()
+    losses = 0
     for batch_idx, (data, target) in enumerate(train_loader):
         data, target = Variable(data, volatile=True).cuda(), Variable(target).cuda() # if you have access to a gpu
         # data, target = Variable(data), Variable(target)
         optimizer.zero_grad()
         output = model(data)  # calls the forward function
         loss = F.nll_loss(output, target)
+        losses = losses + loss.data[0]
+
         loss.backward()
         optimizer.step()
-    return model
+    return model, (losses / data.size(0))
 
 
 def valid(model, valid_loader):
@@ -134,7 +156,7 @@ def valid(model, valid_loader):
     print('\n' + "valid" + ' set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
         valid_loss, correct, len(valid_loader.dataset),
         100. * correct / len(valid_loader.dataset)))
-    return correct / len(valid_loader.dataset)
+    return correct / len(valid_loader.dataset), valid_loss
 
 
 def test(model, test_loader):
@@ -155,25 +177,47 @@ def test(model, test_loader):
         100. * correct / len(test_loader.dataset)))
 
 
-def experiment(model, epochs=10, lr=0.001):
+def experiment(model, epochs=10, lr=0.001, act_func, nb_layers):
     best_precision = 0
     optimizer = optim.Adam(model.parameters(), lr=lr)
+    train_losses, val_losses = [], []
     for epoch in range(1, epochs + 1):
-        model = train(model, train_loader, optimizer)
-        precision = valid(model, valid_loader)
+        model, train_loss = train(model, train_loader, optimizer)
+        precision, val_loss = valid(model, valid_loader)
+
+        train_losses.append(train_loss)
+        val_losses.append(val_loss)
 
         if precision > best_precision:
             best_precision = precision
             best_model = model
+
+    fig = plt.figure()
+    plt.plot(train_losses, label='train')
+    plt.plot(val_losses, label='validation')
+
+    plt.xlabel('Epoch')
+    plt.xlim(0, epochs)
+
+    plt.ylabel('Average negative log loss')
+    plt.title('Average negative log loss ', type(model).__name__)
+
+    plt.legend(loc='best')
+
+    fig.savefig('./Graphs/Graph' + )
+    #plt.show()
+
     return best_model, best_precision
 
 
 best_precision = 0
-for model in [Cnn()]:  # add your models in the list
-    model.cuda()  # if you have access to a gpu
-    model, precision = experiment(model)
-    if precision > best_precision:
-        best_precision = precision
-        best_model = model
+for act_func in [F.sigmoid, F.tanh, F.relu]:
+    for nb_layers in range(2, 5):
+        for model in [FcNetwork(act_func, nb_layers), Cnn(act_func, nb_layers)]:  # add your models in the list
+            model.cuda()  # if you have access to a gpu
+            model, precision = experiment(model, act_func=act_func, nb_layers=nb_layers)
+            if precision > best_precision:
+                best_precision = precision
+                best_model = model
 
 test(best_model, test_loader)
