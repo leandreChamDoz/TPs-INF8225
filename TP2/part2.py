@@ -66,31 +66,31 @@ kernel_size_pooling = 2
 
 
 class FcNetwork(nn.Module):
-    def __init__(self, act_func, nb_layers):
+    def __init__(self):
         super().__init__()
-        self.nb_layers = nb_layers
-        self.act_func = act_func
-
-        self.fcStart = nn.Linear(28 * 28, 512)
-        self.fcEnd = nn.Linear(512, 10)
-
-        for i in range(nb_layers - 2):
-
+        self.fc1 = nn.Linear(28 * 28, 512)
+        self.fc2 = nn.Linear(512, 128)
+        self.fc3 = nn.Linear(128, 10)
 
     def forward(self, image):
         batch_size = image.size()[0]
-        x = image.view(batch_size, -1)
-        x = F.sigmoid(self.fc1(x))
-        x = F.log_softmax(self.fc2(x), dim=1)
-        return x
+        output = image.view(batch_size, -1)
+
+        #output = F.sigmoid(self.fc1(output))
+        output = F.relu(self.fc1(output))
+
+        #output = F.sigmoid(self.fc2(output))
+        output = F.relu(self.fc2(output))
+
+        # output = F.log_softmax(self.fc2(output), dim=1)
+
+        return F.log_softmax(self.fc3(output), dim=1)
+        return output
 
 
 class Cnn(nn.Module):
-    def __init__(self, act_func, nb_layers):
+    def __init__(self):
         super().__init__()
-        self.act_func = act_func
-        self.nb_layers = nb_layers
-
         self.kernel1 = nn.Sequential(
             nn.Conv2d(1, 32, kernel_size, stride=1, padding=2),
             nn.ReLU(),
@@ -102,26 +102,25 @@ class Cnn(nn.Module):
             nn.ReLU(),
             nn.MaxPool2d(kernel_size_pooling, stride=2)
         )
-
-        self.layers = []
-        self.layers.append(nn.Linear(7 * 7 * 64, 1000))
-
-        lastOutput = 1000
-
-        for i in range(nb_layers-2):
-            newOutput = int(random)
-            self.layers.append(nn.Linear(lastOutput, ))
-
-        self.layers.append(nn.Linear(1000, 10))
         self.drop_out = nn.Dropout()
+        self.fc1 = nn.Linear(7 * 7 * 64, 1000)
+        self.fc2 = nn.Linear(1000, 512)
+        self.fc3 = nn.Linear(512, 10)
 
     def forward(self, image):
         output = self.kernel1(image)
         output = self.kernel2(output)
         output = output.reshape(output.size(0), -1)
         output = self.drop_out(output)
+
+        #output = F.sigmoid(self.fc1(output))
         output = F.relu(self.fc1(output))
-        return F.log_softmax(self.fc2(output), dim=1)
+
+        #output = F.sigmoid(self.fc2(output))
+        output = F.relu(self.fc2(output))
+
+        #return F.log_softmax(self.fc2(output), dim=1)
+        return F.log_softmax(self.fc3(output), dim=1)
 
 
 def train(model, train_loader, optimizer):
@@ -133,11 +132,13 @@ def train(model, train_loader, optimizer):
         optimizer.zero_grad()
         output = model(data)  # calls the forward function
         loss = F.nll_loss(output, target)
-        losses = losses + loss.data[0]
+        losses += loss.item()
 
         loss.backward()
         optimizer.step()
-    return model, (losses / data.size(0))
+
+    average_loss = losses / len(train_loader.dataset)
+    return model, average_loss
 
 
 def valid(model, valid_loader):
@@ -148,7 +149,7 @@ def valid(model, valid_loader):
         data, target = Variable(data, volatile=True).cuda(), Variable(target).cuda() # if you have access to a gpu
         # data, target = Variable(data, volatile=True), Variable(target)
         output = model(data)
-        valid_loss += F.nll_loss(output, target, size_average=False).data.item()  # sum up batch loss
+        valid_loss += F.nll_loss(output, target).item()  # sum up batch loss
         pred = output.data.max(1, keepdim=True)[1]  # get the index of the max log-probability
         correct += pred.eq(target.data.view_as(pred)).cpu().sum()
 
@@ -156,7 +157,8 @@ def valid(model, valid_loader):
     print('\n' + "valid" + ' set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
         valid_loss, correct, len(valid_loader.dataset),
         100. * correct / len(valid_loader.dataset)))
-    return correct / len(valid_loader.dataset), valid_loss
+
+    return correct.item() / len(valid_loader.dataset), valid_loss
 
 
 def test(model, test_loader):
@@ -167,7 +169,7 @@ def test(model, test_loader):
         data, target = Variable(data, volatile=True).cuda(), Variable(target).cuda() # if you have access to a gpu
         # data, target = Variable(data, volatile=True), Variable(target)
         output = model(data)
-        test_loss += F.nll_loss(output, target, size_average=False).data.item() # sum up batch loss
+        test_loss += F.nll_loss(output, target, size_average=False).item() # sum up batch loss
         pred = output.data.max(1, keepdim=True)[1]  # get the index of the max log-probability
         correct += pred.eq(target.data.view_as(pred)).cpu().sum()
 
@@ -177,13 +179,15 @@ def test(model, test_loader):
         100. * correct / len(test_loader.dataset)))
 
 
-def experiment(model, epochs=10, lr=0.001, act_func, nb_layers):
+def experiment(model, epochs=10, lr=0.001):
     best_precision = 0
     optimizer = optim.Adam(model.parameters(), lr=lr)
     train_losses, val_losses = [], []
+    precisions = []
     for epoch in range(1, epochs + 1):
         model, train_loss = train(model, train_loader, optimizer)
         precision, val_loss = valid(model, valid_loader)
+        precisions.append(precision * 100)
 
         train_losses.append(train_loss)
         val_losses.append(val_loss)
@@ -197,27 +201,39 @@ def experiment(model, epochs=10, lr=0.001, act_func, nb_layers):
     plt.plot(val_losses, label='validation')
 
     plt.xlabel('Epoch')
-    plt.xlim(0, epochs)
+    plt.xlim(0, epochs-1)
 
     plt.ylabel('Average negative log loss')
-    plt.title('Average negative log loss ', type(model).__name__)
+    plt.title('Average negative log loss ' + str(type(model).__name__))
 
     plt.legend(loc='best')
 
-    fig.savefig('./Graphs/Graph' + )
-    #plt.show()
+    fig.savefig('./Graphs/Graph_' + str(type(model).__name__) + '_ALL_' + '3_' + 'Relu')
+
+
+    fig = plt.figure()
+    plt.plot(precisions, label='validation')
+
+    plt.xlabel('Epoch')
+    plt.xlim(0, epochs-1)
+
+    plt.ylabel('Precision (in %)')
+    plt.title('Learning curve ' + str(type(model).__name__))
+
+    plt.legend(loc='best')
+
+    fig.savefig('./Graphs/Graph_' + str(type(model).__name__) + '_learning_' + '3_' + 'Relu')
+    # plt.show()
 
     return best_model, best_precision
 
 
 best_precision = 0
-for act_func in [F.sigmoid, F.tanh, F.relu]:
-    for nb_layers in range(2, 5):
-        for model in [FcNetwork(act_func, nb_layers), Cnn(act_func, nb_layers)]:  # add your models in the list
-            model.cuda()  # if you have access to a gpu
-            model, precision = experiment(model, act_func=act_func, nb_layers=nb_layers)
-            if precision > best_precision:
-                best_precision = precision
-                best_model = model
+for model in [FcNetwork(), Cnn()]:  # add your models in the list
+    model.cuda()  # if you have access to a gpu
+    model, precision = experiment(model)
+    if precision > best_precision:
+        best_precision = precision
+        best_model = model
 
 test(best_model, test_loader)
