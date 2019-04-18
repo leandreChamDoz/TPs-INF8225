@@ -1,63 +1,77 @@
-import torch
+from math import ceil
 import numpy as np
-import torchvision
 import matplotlib.pyplot as plt
-import torchvision.transforms as transforms
-from torch.utils.data import Dataset, DataLoader
-from torch import nn
-from torch import optim
-import torch.nn.functional as F
-import random
+import torch
+from torch import nn, optim
 from torch.autograd import Variable
+import torchvision
+import torch.nn.functional as F
+from torchvision import transforms, datasets
 
 
+def prepare_data():
+    fashion = datasets.FashionMNIST
 
-train_data = torchvision.datasets.FashionMNIST('./data',
-                                                  train=True,
-                                                  download=True,
-                                                  transform=transforms.Compose(
-                                                      [
-                                                          transforms.ToTensor(),
-                                                          transforms.Normalize((0.1307,), (0.3081,))
-                                                      ])
-                                                  )
+    train_data = fashion(
+        "./data/fashion_mnist",
+        train=True,
+        download=True,
+        transform=transforms.Compose(
+            [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
+        ),
+    )
 
-valid_data = torchvision.datasets.FashionMNIST('./data',
-                                               train=True,
-                                               download=True,
-                                               transform=transforms.Compose([
-                                                   transforms.ToTensor(),
-                                                   transforms.Normalize((0.1307,), (0.3081,))
-                                               ])
-                                               )
+    valid_data = fashion(
+        "./data/fashion_mnist",
+        train=True,
+        download=True,
+        transform=transforms.Compose(
+            [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
+        ),
+    )
 
-train_idx = np.random.choice(train_data.train_data.shape[0], 54000, replace=False)
+    train_idx = np.random.choice(train_data.train_data.shape[0], 54000, replace=False)
+    train_data.train_data = train_data.train_data[train_idx, :]
+    train_data.train_labels = train_data.train_labels[
+        torch.from_numpy(train_idx).type(torch.LongTensor)
+    ]
 
-train_data.train_data = train_data.train_data[train_idx, :]
-train_data.train_labels = train_data.train_labels[torch.from_numpy(train_idx).type(torch.LongTensor)]
+    mask = np.ones(60000)
+    mask[train_idx] = 0
 
-mask = np.ones(60000)
-mask[train_idx] = 0
+    valid_data.train_data = valid_data.train_data[
+        torch.from_numpy(np.argwhere(mask)), :
+    ].squeeze()
+    valid_data.train_labels = valid_data.train_labels[
+        torch.from_numpy(mask).type(torch.ByteTensor)
+    ]
 
-valid_data.train_data = valid_data.train_data[torch.from_numpy(np.argwhere(mask)), :].squeeze()
-valid_data.train_labels = valid_data.train_labels[torch.from_numpy(mask).type(torch.ByteTensor)]
+    batch_size = 100
+    test_batch_size = 100
 
+    train_loader = torch.utils.data.DataLoader(
+        train_data, batch_size=batch_size, shuffle=True
+    )
 
-batch_size = 100
-test_batch_size = 100
+    valid_loader = torch.utils.data.DataLoader(
+        valid_data, batch_size=batch_size, shuffle=True
+    )
 
-train_loader = torch.utils.data.DataLoader(train_data,
-    batch_size=batch_size, shuffle=True)
+    test_loader = torch.utils.data.DataLoader(
+        fashion(
+            "../data/fashion_mnist",
+            train=False,
+            download=True,
+            transform=transforms.Compose(
+                [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
+            ),
+        ),
+        batch_size=test_batch_size,
+        shuffle=True,
+    )
 
-valid_loader = torch.utils.data.DataLoader(valid_data,
-    batch_size=batch_size, shuffle=True)
+    return train_loader, valid_loader, test_loader
 
-test_loader = torch.utils.data.DataLoader(
-    torchvision.datasets.FashionMNIST('./data', train=False, transform=transforms.Compose([
-                       transforms.ToTensor(),
-                       transforms.Normalize((0.1307,), (0.3081,))
-                   ])),
-    batch_size=test_batch_size, shuffle=True)
 
 plt.imshow(train_loader.dataset.train_data[1].numpy())
 
@@ -125,12 +139,11 @@ class Cnn(nn.Module):
 
 def train(model, train_loader, optimizer):
     model.train()
-    losses = 0
+    total_loss = 0
     for batch_idx, (data, target) in enumerate(train_loader):
-        data, target = Variable(data, volatile=True).cuda(), Variable(target).cuda() # if you have access to a gpu
-        # data, target = Variable(data), Variable(target)
+        data, target = Variable(data), Variable(target)
         optimizer.zero_grad()
-        output = model(data)  # calls the forward function
+        output = model(data)
         loss = F.nll_loss(output, target)
         losses += loss.item()
 
@@ -143,7 +156,7 @@ def train(model, train_loader, optimizer):
 
 def valid(model, valid_loader):
     model.eval()
-    valid_loss = 0
+    total_loss = 0
     correct = 0
     for data, target in valid_loader:
         data, target = Variable(data, volatile=True).cuda(), Variable(target).cuda() # if you have access to a gpu
@@ -174,13 +187,19 @@ def test(model, test_loader):
         correct += pred.eq(target.data.view_as(pred)).cpu().sum()
 
     test_loss /= len(test_loader.dataset)
-    print('\n' + "test" + ' set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
-        test_loss, correct, len(test_loader.dataset),
-        100. * correct / len(test_loader.dataset)))
+    print(
+        "test set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)".format(
+            test_loss,
+            correct,
+            len(test_loader.dataset),
+            100.0 * correct / len(test_loader.dataset),
+        )
+    )
 
 
 def experiment(model, epochs=10, lr=0.001):
     best_precision = 0
+    best_model = None
     optimizer = optim.Adam(model.parameters(), lr=lr)
     train_losses, val_losses = [], []
     precisions = []
@@ -196,9 +215,7 @@ def experiment(model, epochs=10, lr=0.001):
             best_precision = precision
             best_model = model
 
-    fig = plt.figure()
-    plt.plot(train_losses, label='train')
-    plt.plot(val_losses, label='validation')
+    return precisions,best_model, best_precision, losses_train, losses_validation
 
     plt.xlabel('Epoch')
     plt.xlim(0, epochs-1)
@@ -206,7 +223,12 @@ def experiment(model, epochs=10, lr=0.001):
     plt.ylabel('Average negative log loss')
     plt.title('Average negative log loss ' + str(type(model).__name__))
 
-    plt.legend(loc='best')
+    def forward(self, image):
+        batch_size = image.size()[0]
+        x = image.view(batch_size, -1)
+        x = F.sigmoid(self.fc1(x))
+        x = F.log_softmax(self.fc2(x), dim=1)
+        return x
 
     fig.savefig('./Graphs/Graph_' + str(type(model).__name__) + '_ALL_' + '3_' + 'Relu')
 
@@ -227,6 +249,8 @@ def experiment(model, epochs=10, lr=0.001):
 
     return best_model, best_precision
 
+    best_precision = 0
+    best_model = None
 
 best_precision = 0
 for model in [FcNetwork(), Cnn()]:  # add your models in the list
@@ -236,4 +260,57 @@ for model in [FcNetwork(), Cnn()]:  # add your models in the list
         best_precision = precision
         best_model = model
 
-test(best_model, test_loader)
+    fig = plt.figure()
+    fig.tight_layout(h_pad=3.2)
+    # f, ax = plt.subplots(len(models))
+    cols = 3
+    precisions = []
+
+    precisions, model, precision, losses_train, losses_validation = experiment(FcNetwork(), epochs=10)
+
+    # for i, model in enumerate(models):
+    #     model_name = model.__class__.__name__
+    #     print("\nTraining model", model_name)
+    #     precisions, model, precision, losses_train, losses_validation = experiment(model, epochs=10)
+    #     model_stats.append((model_name, precision))
+    #
+    #     print(rows, cols)
+    #     ax = fig.add_subplot(rows, cols, i + 1)
+    #     ax.plot(losses_train, "-b", label="Training")
+    #     ax.plot(losses_validation, "-r", label="Validation")
+    #     ax.legend()
+    #     ax.text(
+    #         0.5,
+    #         0.5,
+    #         f"accuracy: {precision:.4f}",
+    #         size=8,
+    #         ha="center",
+    #         transform=ax.transAxes,
+    #     )
+    #     ax.text(
+    #         0.5,
+    #         0.55,
+    #         f"average loss: {sum(losses_validation)/ len(losses_validation):.4f}",
+    #         size=8,
+    #         ha="center",
+    #         transform=ax.transAxes,
+    #     )
+    #     ax.set_title(f"{model_name}")
+    #     ax.set_ylabel("Mean NLL")
+    #     # ax.set_xlabel("Epoch")
+    #
+    #     if precision > best_precision:
+    #         best_precision = precision
+    #         best_model = model
+    #
+    # plt.show()
+    #
+    # print("model statistics", *model_stats, sep="\n\t- ")
+    # print(
+    #     "The best model is ",
+    #     model.__class__.__name__,
+    #     "with a validation precision of",
+    #     best_precision,
+    # )
+    # print(model)
+    test(best_model, test_loader)
