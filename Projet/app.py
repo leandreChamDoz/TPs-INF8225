@@ -3,24 +3,25 @@ from IPython import display
 from utils import Logger
 
 import torch
+import os
 from torch import nn
 from torch.optim import Adam
 from torch.autograd import Variable
 
 from torchvision import transforms, datasets
 
-DATA_FOLDER = './torch_data/DCGAN/MNIST'
+DATA_FOLDER = 'mutant_data/'
 
 
 def mnist_data():
     compose = transforms.Compose(
         [
-            transforms.Resize(64),
+            transforms.Resize((128, 128)),
             transforms.ToTensor(),
             transforms.Normalize((.5, .5, .5), (.5, .5, .5))
         ])
     out_dir = '{}/dataset'.format(DATA_FOLDER)
-    return datasets.MNIST(root=out_dir, train=True, transform=compose, download=True)
+    return datasets.ImageFolder(root=DATA_FOLDER, transform=compose)
 
 
 data = mnist_data()
@@ -36,7 +37,7 @@ class DiscriminativeNet(torch.nn.Module):
 
         self.conv1 = nn.Sequential(
             nn.Conv2d(
-                in_channels=1, out_channels=128, kernel_size=4,
+                in_channels=3, out_channels=128, kernel_size=4,
                 stride=2, padding=1, bias=False
             ),
             nn.LeakyReLU(0.2, inplace=True)
@@ -66,7 +67,7 @@ class DiscriminativeNet(torch.nn.Module):
             nn.LeakyReLU(0.2, inplace=True)
         )
         self.out = nn.Sequential(
-            nn.Linear(1024 * 4 * 4, 1),
+            nn.Linear(1024 * 8 * 8, 1),
             nn.Sigmoid(),
         )
 
@@ -77,7 +78,7 @@ class DiscriminativeNet(torch.nn.Module):
         x = self.conv3(x)
         x = self.conv4(x)
         # Flatten and apply sigmoid
-        x = x.view(-1, 1024 * 4 * 4)
+        x = x.view(-1, 1024 * 8 * 8)
         x = self.out(x)
         return x
 
@@ -87,7 +88,7 @@ class GenerativeNet(torch.nn.Module):
     def __init__(self):
         super(GenerativeNet, self).__init__()
 
-        self.linear = torch.nn.Linear(100, 1024 * 4 * 4)
+        self.linear = torch.nn.Linear(100, 1024 * 8 * 8)
 
         self.conv1 = nn.Sequential(
             nn.ConvTranspose2d(
@@ -115,7 +116,7 @@ class GenerativeNet(torch.nn.Module):
         )
         self.conv4 = nn.Sequential(
             nn.ConvTranspose2d(
-                in_channels=128, out_channels=1, kernel_size=4,
+                in_channels=128, out_channels=3, kernel_size=4,
                 stride=2, padding=1, bias=False
             )
         )
@@ -124,7 +125,7 @@ class GenerativeNet(torch.nn.Module):
     def forward(self, x):
         # Project and reshape
         x = self.linear(x)
-        x = x.view(x.shape[0], 1024, 4, 4)
+        x = x.view(x.shape[0], 1024, 8, 8)
         # Convolutional layers
         x = self.conv1(x)
         x = self.conv2(x)
@@ -194,6 +195,7 @@ def train_discriminator(optimizer, real_data, fake_data):
     # 1. Train on Real Data
     prediction_real = discriminator(real_data)
     # Calculate error and backpropagate
+
     error_real = loss(prediction_real, real_data_target(real_data.size(0)))
     error_real.backward()
 
