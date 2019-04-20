@@ -6,6 +6,7 @@ import torch
 from torch import nn, optim
 from torch.autograd.variable import Variable
 from torchvision import transforms, datasets
+import csv
 
 from GAN_Discriminator import GANDiscriminatorNet
 from GAN_Generator import GANGeneratorNet
@@ -125,6 +126,12 @@ test_noise = noise(num_test_samples)
 
 logger = Logger(model_name='VGAN', data_name='MNIST')
 
+premiere_ligne = ["lossGenerator", "lossDiscriminator", "minDOutputREAL", "minDOutputFake"]
+with open('resultsGAN.csv', 'a', newline='') as myfile:
+    wr = csv.writer(myfile, quoting=csv.QUOTE_ALL)
+    wr.writerow(premiere_ligne)
+
+
 for epoch in range(num_epochs):
     for n_batch, (real_batch,_) in enumerate(data_loader):
         # 1. Train Discriminator
@@ -157,5 +164,9 @@ for epoch in range(num_epochs):
                 epoch, num_epochs, n_batch, num_batches,
                 d_error, g_error, d_pred_real, d_pred_fake
             )
+            new_line = [g_error, d_error, d_pred_real.mean(), d_pred_fake.mean()]
+            with open('resultsGAN.csv', 'a', newline='') as myfile:
+                wr = csv.writer(myfile, quoting=csv.QUOTE_ALL)
+                wr.writerow(new_line)
         # Model Checkpoints
         logger.save_models(generator, discriminator, epoch)
