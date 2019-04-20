@@ -1,0 +1,2 @@
+"lossGenerator","lossDiscriminator","minDOutputREAL","minDOutputFake"
+"tensor(0.7200, grad_fn=<BinaryCrossEntropyBackward>)","tensor(1.3816, grad_fn=<AddBackward0>)","tensor(0.5009, grad_fn=<MeanBackward1>)","tensor(0.4985, grad_fn=<MeanBackward1>)"

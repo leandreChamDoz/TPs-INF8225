@@ -8,10 +8,10 @@ from torch.autograd.variable import Variable
 from torchvision import transforms, datasets
 import csv
 
-from GAN_Discriminator import GANDiscriminatorNet
-from GAN_Generator import GANGeneratorNet
+from GAN_classic.GAN_Discriminator import GANDiscriminatorNet
+from GAN_classic.GAN_Generator import GANGeneratorNet
 
-DATA_FOLDER = 'mutant_data/'
+DATA_FOLDER = '../mutant_data/'
 
 
 def mnist_data():
@@ -124,7 +124,7 @@ num_test_samples = 16
 test_noise = noise(num_test_samples)
 
 
-logger = Logger(model_name='VGAN', data_name='MNIST')
+logger = Logger(model_name='Classic_GAN', data_name='Cats')
 
 premiere_ligne = ["lossGenerator", "lossDiscriminator", "minDOutputREAL", "minDOutputFake"]
 with open('resultsGAN.csv', 'a', newline='') as myfile:

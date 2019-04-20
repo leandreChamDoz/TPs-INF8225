@@ -9,8 +9,9 @@ from torch.optim import Adam
 from torch.autograd import Variable
 
 from torchvision import transforms, datasets
+import csv
 
-DATA_FOLDER = 'mutant_data/'
+DATA_FOLDER = '../mutant_data/'
 
 
 def mnist_data():
@@ -20,7 +21,6 @@ def mnist_data():
             transforms.ToTensor(),
             transforms.Normalize((.5, .5, .5), (.5, .5, .5))
         ])
-    out_dir = '{}/dataset'.format(DATA_FOLDER)
     return datasets.ImageFolder(root=DATA_FOLDER, transform=compose)
 
 
@@ -229,7 +229,12 @@ def train_generator(optimizer, fake_data):
 num_test_samples = 16
 test_noise = noise(num_test_samples)
 
-logger = Logger(model_name='DCGAN', data_name='MNIST')
+logger = Logger(model_name='DCGAN', data_name='Cats')
+
+premiere_ligne = ["lossGenerator", "lossDiscriminator", "minDOutputREAL", "minDOutputFake"]
+with open('resultsDCGAN.csv', 'a', newline='') as myfile:
+    wr = csv.writer(myfile, quoting=csv.QUOTE_ALL)
+    wr.writerow(premiere_ligne)
 
 for epoch in range(num_epochs):
     for n_batch, (real_batch, _) in enumerate(data_loader):
@@ -262,5 +267,9 @@ for epoch in range(num_epochs):
                 epoch, num_epochs, n_batch, num_batches,
                 d_error, g_error, d_pred_real, d_pred_fake
             )
+            new_line = [g_error, d_error, d_pred_real.mean(), d_pred_fake.mean()]
+            with open('resultsDCGAN.csv', 'a', newline='') as myfile:
+                wr = csv.writer(myfile, quoting=csv.QUOTE_ALL)
+                wr.writerow(new_line)
         # Model Checkpoints
         logger.save_models(generator, discriminator, epoch)
