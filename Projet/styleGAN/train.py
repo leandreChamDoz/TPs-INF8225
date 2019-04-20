@@ -55,7 +55,7 @@ def adjust_lr(optimizer, lr):
 
 def train(args, dataset, generator, discriminator):
 
-    premiere_ligne = ["lossGenerator", "lossDiscriminator", "minDOutputREAL", "minDOutputFake"]
+    premiere_ligne = ["resolution", "lossGenerator", "lossDiscriminator"]
     with open('results_STYLE_GAN.csv', 'a', newline='') as myfile:
         wr = csv.writer(myfile, quoting=csv.QUOTE_ALL)
         wr.writerow(premiere_ligne)
@@ -240,7 +240,7 @@ def train(args, dataset, generator, discriminator):
                 range=(-1, 1),
             )
 
-            new_line = [gen_loss_val, disc_loss_val]
+            new_line = [resolution, gen_loss_val, disc_loss_val]
             with open('results_STYLE_GAN.csv', 'a', newline='') as myfile:
                 wr = csv.writer(myfile, quoting=csv.QUOTE_ALL)
                 wr.writerow(new_line)
