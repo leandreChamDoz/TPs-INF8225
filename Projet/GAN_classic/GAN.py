@@ -17,7 +17,7 @@ DATA_FOLDER = '../mutant_data/'
 def mnist_data():
     compose = transforms.Compose(
         [
-            transforms.Resize((128,128)),
+            transforms.Resize((128, 128)),
             transforms.ToTensor(),
             transforms.Normalize((.5, .5, .5), (.5, .5, .5))
         ])

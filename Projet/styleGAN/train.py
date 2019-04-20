@@ -5,6 +5,7 @@ import math
 from tqdm import tqdm
 import numpy as np
 from PIL import Image
+import csv
 
 import torch
 from torch import nn, optim
@@ -53,6 +54,12 @@ def adjust_lr(optimizer, lr):
 
 
 def train(args, dataset, generator, discriminator):
+
+    premiere_ligne = ["lossGenerator", "lossDiscriminator", "minDOutputREAL", "minDOutputFake"]
+    with open('results_STYLE_GAN.csv', 'a', newline='') as myfile:
+        wr = csv.writer(myfile, quoting=csv.QUOTE_ALL)
+        wr.writerow(premiere_ligne)
+
     step = int(math.log2(args.init_size)) - 2
     resolution = 4 * 2 ** step
     loader = sample_data(
@@ -232,6 +239,11 @@ def train(args, dataset, generator, discriminator):
                 normalize=True,
                 range=(-1, 1),
             )
+
+            new_line = [gen_loss_val, disc_loss_val]
+            with open('results_STYLE_GAN.csv', 'a', newline='') as myfile:
+                wr = csv.writer(myfile, quoting=csv.QUOTE_ALL)
+                wr.writerow(new_line)
 
         if (i + 1) % 10000 == 0:
             torch.save(
