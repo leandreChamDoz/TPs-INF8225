@@ -13,7 +13,7 @@ from torch.autograd import Variable, grad
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms, utils
 
-from model import StyledGenerator, Discriminator
+from styleGAN.model import StyledGenerator, Discriminator
 
 
 def requires_grad(model, flag=True):
@@ -248,19 +248,19 @@ def train(args, dataset, generator, discriminator):
 
 if __name__ == '__main__':
     code_size = 512
-    batch_size = 16
+    batch_size = 100
     n_critic = 1
 
     parser = argparse.ArgumentParser(description='Progressive Growing of GANs')
 
     parser.add_argument('path', type=str, help='path of specified dataset')
     parser.add_argument(
-        '--n_gpu', type=int, default=4, help='number of gpu used for training'
+        '--n_gpu', type=int, default=1, help='number of gpu used for training'
     )
     parser.add_argument(
         '--phase',
         type=int,
-        default=600_000,
+        default=10_000,
         help='number of samples used for each training phases',
     )
     parser.add_argument('--lr', default=0.001, type=float, help='learning rate')
