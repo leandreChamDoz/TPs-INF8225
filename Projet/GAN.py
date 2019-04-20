@@ -15,11 +15,12 @@ DATA_FOLDER = 'mutant_data/'
 
 def mnist_data():
     compose = transforms.Compose(
-        [transforms.ToTensor(),
-         transforms.Normalize((.5, .5, .5), (.5, .5, .5))
+        [
+            transforms.Resize((128,128)),
+            transforms.ToTensor(),
+            transforms.Normalize((.5, .5, .5), (.5, .5, .5))
         ])
-    out_dir = '{}/dataset'.format(DATA_FOLDER)
-    return datasets.MNIST(root=out_dir, train=True, transform=compose, download=True)
+    return datasets.ImageFolder(root=DATA_FOLDER, transform=compose)
 
 
 # Load data
@@ -31,11 +32,11 @@ num_batches = len(data_loader)
 
 
 def images_to_vectors(images):
-    return images.view(images.size(0), 784)
+    return images.view(images.size(0), 49152)
 
 
 def vectors_to_images(vectors):
-    return vectors.view(vectors.size(0), 1, 28, 28)
+    return vectors.view(vectors.size(0), 3, 128, 128)
 
 
 # Noise
@@ -126,10 +127,11 @@ logger = Logger(model_name='VGAN', data_name='MNIST')
 
 for epoch in range(num_epochs):
     for n_batch, (real_batch,_) in enumerate(data_loader):
-
         # 1. Train Discriminator
+
         real_data = Variable(images_to_vectors(real_batch))
         if torch.cuda.is_available(): real_data = real_data.cuda()
+
         # Generate fake data
         fake_data = generator(noise(real_data.size(0))).detach()
         # Train D
@@ -149,7 +151,7 @@ for epoch in range(num_epochs):
             display.clear_output(True)
             # Display Images
             test_images = vectors_to_images(generator(test_noise)).data.cpu()
-            logger.log_images(test_images, num_test_samples, epoch, n_batch, num_batches);
+            logger.log_images(test_images, num_test_samples, epoch, n_batch, num_batches)
             # Display status Logs
             logger.display_status(
                 epoch, num_epochs, n_batch, num_batches,
