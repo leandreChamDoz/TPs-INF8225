@@ -10,7 +10,7 @@ class GANGeneratorNet(torch.nn.Module):
     def __init__(self):
         super(GANGeneratorNet, self).__init__()
         n_features = 100
-        n_out = 49152
+        n_out = 784
 
         self.hidden0 = nn.Sequential(
             nn.Linear(n_features, 256),

@@ -8,20 +8,20 @@ from torch.autograd.variable import Variable
 from torchvision import transforms, datasets
 import csv
 
-from GAN_classic.GAN_Discriminator import GANDiscriminatorNet
-from GAN_classic.GAN_Generator import GANGeneratorNet
+from GAN_Discriminator import GANDiscriminatorNet
+from GAN_Generator import GANGeneratorNet
 
-DATA_FOLDER = '../mutant_data/'
+DATA_FOLDER = './torch_data/VGAN/MNIST'
 
 
 def mnist_data():
     compose = transforms.Compose(
         [
-            transforms.Resize((128, 128)),
             transforms.ToTensor(),
             transforms.Normalize((.5, .5, .5), (.5, .5, .5))
         ])
-    return datasets.ImageFolder(root=DATA_FOLDER, transform=compose)
+    out_dir = '{}/dataset'.format(DATA_FOLDER)
+    return datasets.MNIST(root=out_dir, train=True, transform=compose, download=True)
 
 
 # Load data
@@ -33,11 +33,11 @@ num_batches = len(data_loader)
 
 
 def images_to_vectors(images):
-    return images.view(images.size(0), 49152)
+    return images.view(images.size(0), 784)
 
 
 def vectors_to_images(vectors):
-    return vectors.view(vectors.size(0), 3, 128, 128)
+    return vectors.view(vectors.size(0), 1, 28, 28)
 
 
 # Noise

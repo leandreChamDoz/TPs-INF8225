@@ -9,7 +9,7 @@ class GANDiscriminatorNet(torch.nn.Module):
 
     def __init__(self):
         super(GANDiscriminatorNet, self).__init__()
-        n_features = 49152
+        n_features = 784
         n_out = 1
 
         self.hidden0 = nn.Sequential(
